@@ -1,4 +1,4 @@
-name: sym-key-crypt
+name: pubic-key-crypt
 
 services:
   sender:
