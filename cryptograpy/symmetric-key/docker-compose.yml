@@ -1,0 +1,16 @@
+name: sym-crypt
+
+services:
+  sender:
+    build: .
+    container_name: sender
+    command: bash
+    tty: true
+    volumes:
+      - ./volumes/app:/app
+  receiver:
+    build: .
+    container_name: receiver
+    command: ./connect/listen-and-echo.bash
+    volumes:
+      - ./volumes/app:/app
