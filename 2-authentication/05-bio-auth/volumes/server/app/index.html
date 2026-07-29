@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WebAuthn Minimal Demo</title>
+  <style>
+    body { font-family: sans-serif; max-width: 400px; margin: 50px auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+    input, button { width: 100%; padding: 10px; margin: 8px 0; box-sizing: border-box; }
+    button { background: #0070f3; color: white; border: none; cursor: pointer; font-weight: bold; }
+    .msg { padding: 10px; margin: 10px 0; border-radius: 4px; font-weight: bold; }
+    .success { background: #e6f4ea; color: #137333; }
+    .error { background: #fce8e6; color: #c5221f; }
+  </style>
+</head>
+<body>
+  <h2>生体認証 (WebAuthn) デモ</h2>
+  <input type="text" id="username" placeholder="ユーザー名を入力 (例: user1)">
+  <button onclick="registerKey()">Step 1: 指紋・顔の「登録」</button>
+  <button onclick="loginKey()" style="background:#28a745;">Step 2: 生体情報で「ログイン」</button>
+  <div id="output" class="msg" style="display:none;"></div>
+  <p>ブラウザの開発者ツールのコンソールを表示しながら実験してみましょう。</p>
+
+  <script>
+    async function api(url, data) {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      return res.json();
+    }
+
+    function base64urlToUint8Array(base64url) {
+      const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+      const pad = (4 - (base64.length % 4)) % 4;
+      const binary = atob(base64 + '='.repeat(pad));
+      return Uint8Array.from(binary, c => c.charCodeAt(0));
+    }
+
+    function bufferToBase64URL(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (const b of bytes) binary += String.fromCharCode(b);
+      return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    }
+
+    function showMessage(text, isError = false) {
+      const out = document.getElementById('output');
+      out.innerText = text;
+      out.className = 'msg ' + (isError ? 'error' : 'success');
+      out.style.display = 'block';
+    }
+
+    async function registerKey() {
+      const username = document.getElementById('username').value;
+      if (!username) return alert('ユーザー名を入力してください');
+
+      try {
+        const options = await api('/api/register/options', { username });
+        console.info('called /api/register/options : ', options);
+        if (options.error) return showMessage(options.error, true);
+
+        options.challenge = base64urlToUint8Array(options.challenge);
+        options.user.id = base64urlToUint8Array(options.user.id);
+
+        const param = { publicKey: options }
+        console.info('[BEGIN] navigator.credentials.create : ', param);
+        const credential = await navigator.credentials.create(param);
+        console.info('[  END] navigator.credentials.create : ', credential);
+
+        const credentialJSON = {
+          id: credential.id,
+          type: credential.type,
+          response: {
+            attestationObject: bufferToBase64URL(credential.response.attestationObject),
+            clientDataJSON: bufferToBase64URL(credential.response.clientDataJSON)
+          }
+        };
+
+        const result = await api('/api/register/verify', { username, credential: credentialJSON });
+        if (result.error) showMessage(result.error, true);
+        else showMessage(result.message);
+
+      } catch (err) {
+        showMessage('登録キャンセルまたはエラー: ' + err, true);
+      }
+    }
+
+    async function loginKey() {
+      const username = document.getElementById('username').value;
+      if (!username) return alert('ユーザー名を入力してください');
+
+      try {
+        const options = await api('/api/login/options', { username });
+        if (options.error) return showMessage(options.error, true);
+
+        options.challenge = base64urlToUint8Array(options.challenge);
+        options.allowedCredentials = options.allowedCredentials.map(cred => ({
+          ...cred,
+          id: base64urlToUint8Array(cred.id)
+        }));
+
+        const param = { publicKey: options };
+        console.info('[BEGIN] navigator.credentials.get : ', param);
+        const assertion = await navigator.credentials.get(param);
+        console.info('[  END] navigator.credentials.get : ', assertion);
+
+        const assertionJSON = {
+          id: assertion.id,
+          response: {
+            authenticatorData: bufferToBase64URL(assertion.response.authenticatorData),
+            clientDataJSON: bufferToBase64URL(assertion.response.clientDataJSON),
+            signature: bufferToBase64URL(assertion.response.signature)
+          }
+        };
+
+        const result = await api('/api/login/verify', { username, assertion: assertionJSON });
+        if (result.error) showMessage(result.error, true);
+        else showMessage(result.message);
+
+      } catch (err) {
+        showMessage('認証キャンセルまたはエラー: ' + err, true);
+      }
+    }
+  </script>
+</body>
+</html>

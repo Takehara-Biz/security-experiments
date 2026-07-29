@@ -1,0 +1,12 @@
+name: bio-auth
+
+services:
+  # clientは不要。ホストOSのブラウザがクライアントになる
+  server:
+    image: node:26.5.0
+    ports:
+      - 3000:3000
+    working_dir: /app
+    command: ["node", "app.js"]
+    volumes:
+      - ./volumes/server/app:/app
