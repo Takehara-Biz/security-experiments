@@ -1,10 +1,8 @@
 const http = require("http");
-const util = require('util');
 
 const server = http.createServer((req, res) => {
   console.log("begin");
-  // depth（深さ）を浅くして見やすくする
-  console.log(util.inspect(req, { depth: 1, colors: true }));
+  console.log(getLoggableReq(req));
   const authHeader = req.headers["authorization"]
 
   if (!authHeader) {
@@ -48,3 +46,13 @@ function askForAuth(res) {
 server.listen(3000, () => {
   console.log("サーバーがポート3000で起動しました")
 })
+
+function getLoggableReq(req) {
+  return {
+    method: req.method,
+    url: req.originalUrl || req.url,
+    query: req.query,
+    body: req.body,
+    ip: req.ip || req.socket.remoteAddress
+  };
+}
