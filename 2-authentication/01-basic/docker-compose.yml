@@ -1,0 +1,16 @@
+name: auth-basic
+
+services:
+  client:
+    image: alpine/curl:8.21.0
+    working_dir: /app
+    entrypoint: ["sh"]
+    tty: true
+    volumes:
+      - ./volumes/client/app:/app
+  server:
+    image: node:26.5.0
+    working_dir: /app
+    command: ["node", "app.js"]
+    volumes:
+      - ./volumes/server/app:/app
