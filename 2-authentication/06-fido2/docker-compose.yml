@@ -1,4 +1,4 @@
-name: bio-auth
+name: fido2
 
 services:
   # clientは不要。ホストOSのブラウザがクライアントになる

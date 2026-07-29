@@ -37,10 +37,12 @@ const server = http.createServer((req, res) => {
       const { username } = req.body;
       if (!username) return sendJSON(res, 400, { error: 'ユーザー名が必要です' });
 
+      // チャレンジを生成
       const challenge = crypto.getRandomValues(new Uint8Array(32));
       const challengeBase64 = toBase64URL(Buffer.from(challenge));
       challengeStore.set(username, challengeBase64);
 
+      // 生成したチャレンジを渡す
       return sendJSON(res, 200, {
         challenge: challengeBase64,
         rp: { name: "Minimal WebAuthn Demo", id: "localhost" },
@@ -99,6 +101,20 @@ const server = http.createServer((req, res) => {
       console.info('user : ', user);
 
       if (!savedChallenge || !user) return sendJSON(res, 400, { error: 'ログイン認証エラー' });
+
+      console.info(`       
+このサンプルコードはフローの全体像を把握するためのデモ実装です。そのため、最も重要な「電子署名の暗号学的な検証」が省略されています。
+
+本来の本番WebAuthnサーバーの実装では、if (!savedChallenge || !user) の後に以下の検証プロセスを行います：
+
+[クライアントから届いた assertion]
+  │
+  ├─① clientDataJSON をデコードし、送った challenge と一致するか確認
+  ├─② 送信元の origin (https://example.com など) が正しいか確認
+  └─③ 登録時に保存した「公開鍵（user.rawPublicKey）」を使い、
+     「authenticatorData + clientDataJSONのハッシュ」に対する
+     「署名（signature）」が正しいか検証する（暗号学的な整合性チェック）
+        `);
 
       console.log(`[Auth] ユーザー「${username}」の生体検証を通過しました。`);
       challengeStore.delete(username);

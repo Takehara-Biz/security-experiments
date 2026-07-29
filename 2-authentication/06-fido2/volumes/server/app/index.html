@@ -55,16 +55,16 @@
       if (!username) return alert('ユーザー名を入力してください');
 
       try {
+        console.info('[BEGIN] /api/register/options : ', username);
         const options = await api('/api/register/options', { username });
-        console.info('called /api/register/options : ', options);
+        console.info('[  END] /api/register/options : ', options);
         if (options.error) return showMessage(options.error, true);
 
         options.challenge = base64urlToUint8Array(options.challenge);
         options.user.id = base64urlToUint8Array(options.user.id);
 
-        const param = { publicKey: options }
-        console.info('[BEGIN] navigator.credentials.create : ', param);
-        const credential = await navigator.credentials.create(param);
+        console.info('[BEGIN] navigator.credentials.create : ', { publicKey: options });
+        const credential = await navigator.credentials.create({ publicKey: options });
         console.info('[  END] navigator.credentials.create : ', credential);
 
         const credentialJSON = {
@@ -76,7 +76,9 @@
           }
         };
 
+        console.info('[BEGIN] /api/register/verify : ', credentialJSON);
         const result = await api('/api/register/verify', { username, credential: credentialJSON });
+        console.info('[  END] /api/register/verify : ', result);
         if (result.error) showMessage(result.error, true);
         else showMessage(result.message);
 
@@ -99,9 +101,8 @@
           id: base64urlToUint8Array(cred.id)
         }));
 
-        const param = { publicKey: options };
-        console.info('[BEGIN] navigator.credentials.get : ', param);
-        const assertion = await navigator.credentials.get(param);
+        console.info('[BEGIN] navigator.credentials.get : ', { publicKey: options });
+        const assertion = await navigator.credentials.get({ publicKey: options });
         console.info('[  END] navigator.credentials.get : ', assertion);
 
         const assertionJSON = {
@@ -113,7 +114,9 @@
           }
         };
 
+        console.info('[BEGIN] /api/login/verify : ', assertionJSON);
         const result = await api('/api/login/verify', { username, assertion: assertionJSON });
+        console.info('[  END] /api/login/verify : ', result);
         if (result.error) showMessage(result.error, true);
         else showMessage(result.message);
 
