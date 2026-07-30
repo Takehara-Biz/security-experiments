@@ -21,6 +21,7 @@ services:
     command: ["node", "app.js"]
     volumes:
       - ./volumes/resource-server/app:/app
+  # 起動するコンテナが多いですが、ブラウザを開いたら、oauth-clientにまずアクセスしてください。
   oauth-client:
     image: node:26.5.0
     ports:
