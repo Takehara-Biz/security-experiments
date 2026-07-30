@@ -1,0 +1,38 @@
+name: oauth2.0
+
+services:
+  authz-server:
+    image: node:26.5.0
+    ports:
+      - 4000:4000
+    working_dir: /app
+    command: ["node", "app.js"]
+    volumes:
+      - ./volumes/authz-server/app:/app
+  resource-server:
+    image: node:26.5.0
+    ports:
+      - 5001:5001
+    environment:
+      - AUTH_SERVER_INTERNAL_URL=http://authz-server:4000
+    depends_on:
+      - authz-server
+    working_dir: /app
+    command: ["node", "app.js"]
+    volumes:
+      - ./volumes/resource-server/app:/app
+  oauth-client:
+    image: node:26.5.0
+    ports:
+      - 3000:3000
+    environment:
+      - AUTH_SERVER_PUBLIC_URL=http://localhost:4000
+      - AUTH_SERVER_INTERNAL_URL=http://authz-server:4000
+      - RESOURCE_SERVER_INTERNAL_URL=http://resource-server:5001
+    depends_on:
+      - authz-server
+      - resource-server
+    working_dir: /app
+    command: ["node", "app.js"]
+    volumes:
+      - ./volumes/oauth-client/app:/app
