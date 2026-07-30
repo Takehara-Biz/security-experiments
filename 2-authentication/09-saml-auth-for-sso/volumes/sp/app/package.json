@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@node-saml/node-saml": "^5.1.0"
+  }
+}
