@@ -76,6 +76,12 @@
           }
         };
 
+        // credential.response.clientDataJSON からデコードする例
+        const utf8Decoder = new TextDecoder('utf-8');
+        let jsonString = utf8Decoder.decode(credential.response.clientDataJSON);
+        const clientData = JSON.parse(jsonString);
+        console.log('clientDataJSON (parsed) : ', clientData);
+
         console.info('[BEGIN] /api/register/verify : ', credentialJSON);
         const result = await api('/api/register/verify', { username, credential: credentialJSON });
         console.info('[  END] /api/register/verify : ', result);
@@ -92,7 +98,9 @@
       if (!username) return alert('ユーザー名を入力してください');
 
       try {
+        console.info('[BEGIN] /api/login/options : ', { username });
         const options = await api('/api/login/options', { username });
+        console.info('[  END] /api/login/options : ', { options });
         if (options.error) return showMessage(options.error, true);
 
         options.challenge = base64urlToUint8Array(options.challenge);
@@ -113,6 +121,12 @@
             signature: bufferToBase64URL(assertion.response.signature)
           }
         };
+
+        // assertion.response.clientDataJSON からデコードする例
+        const utf8Decoder = new TextDecoder('utf-8');
+        let jsonString = utf8Decoder.decode(assertion.response.clientDataJSON);
+        const clientData = JSON.parse(jsonString);
+        console.log('clientDataJSON (parsed) : ', clientData);
 
         console.info('[BEGIN] /api/login/verify : ', assertionJSON);
         const result = await api('/api/login/verify', { username, assertion: assertionJSON });
