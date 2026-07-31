@@ -1,0 +1,17 @@
+name: auth-basic
+
+services:
+  sender:
+    build: .
+    container_name: sender
+    command: bash
+    tty: true
+    volumes:
+      - ./volumes/app:/app
+  receiver:
+    build: .
+    container_name: receiver
+    command: /app/wait-and-receive.bash
+    tty: true
+    volumes:
+      - ./volumes/app:/app
