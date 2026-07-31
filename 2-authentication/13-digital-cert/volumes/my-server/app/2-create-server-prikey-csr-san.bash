@@ -16,28 +16,28 @@ cat ./server.key
 echo "2-2. CSR (Certificate Signing Request) を作成"
 openssl req -new \
   -key server.key \
-  -out server.csr \
+  -out ./share/server.csr \
   -subj "/C=JP/ST=Tokyo/O=ExampleCorp/CN=my.domain.com"
-echo "[+] CSRを作成しました: server.csr"
-cat ./server.csr
+echo "[+] CSRを作成しました: ./share/server.csr"
+cat ./share/server.csr
 
 echo "↑意味のある文章に変換して出力します"
-openssl req -in server.csr -text -noout
+openssl req -in ./share/server.csr -text -noout
 
 echo "2-3. SAN (主体者代替名) 設定ファイルの作成"
 # 現代のTLS/SSL検証では SAN (Subject Alternative Name) が必須です
-cat <<EOF >server.ext
+cat <<EOF >./share/server.ext
 authorityKeyIdentifier=keyid,issuer
 basicConstraints=CA:FALSE
 keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
 subjectAltName = @alt_names
 
 [alt_names]
-DNS.1 = example.com
-DNS.2 = *.example.com
+DNS.1 = my.domain.com
+DNS.2 = *.my.domain.com
 EOF
-echo "[+] SAN設定ファイルを作成しました: server.ext"
-cat ./server.ext
+echo "[+] SAN設定ファイルを作成しました: ./share/server.ext"
+cat ./share/server.ext
 
 # SAN（Subject Alternative Name）が必要になった最大の理由は、
 # 従来の CN（Common Name）だけでは現代の多様なWeb利用環境（マルチドメインやワイルドカード、IPアドレス指定など）に対応できず、

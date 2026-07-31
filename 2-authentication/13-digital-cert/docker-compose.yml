@@ -1,9 +1,24 @@
 name: digital-signature
 
 services:
-  app:
+  root-ca:
     build: .
     command: bash
     tty: true
     volumes:
-      - ./volumes/app:/app
+      - ./volumes/root-ca/app:/app
+      - ./volumes/share:/app/share
+  my-server:
+    build: .
+    command: bash
+    tty: true
+    volumes:
+      - ./volumes/my-server/app:/app
+      - ./volumes/share:/app/share
+  my-client:
+    build: .
+    command: bash
+    tty: true
+    volumes:
+      - ./volumes/my-client/app:/app
+      - ./volumes/share:/app/share

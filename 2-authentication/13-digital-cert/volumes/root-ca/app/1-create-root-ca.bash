@@ -18,10 +18,10 @@ openssl req -x509 -new -nodes \
   -key ca.key \
   -sha256 \
   -days 365 \
-  -out ca.crt \
+  -out ./share/ca.crt \
   -subj "/C=JP/ST=Tokyo/O=RootCAOrganization/CN=root.ca.com"
-echo "[+] Root CA 証明書を作成しました: ca.crt"
-cat ./ca.crt
+echo "[+] Root CA 証明書を作成しました: ./share/ca.crt"
+cat ./share/ca.crt
 
 echo "↑意味のある文章に変換して出力します"
-openssl x509 -in ca.crt -text -noout
+openssl x509 -in ./share/ca.crt -text -noout
