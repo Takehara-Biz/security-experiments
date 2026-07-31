@@ -1,4 +1,4 @@
-Let's encryptを利用してDV証明書を発行してみる実験
+Let's encryptを利用してDV証明書を発行して、PKIの仕組みを学習する実験
 
 # Let's encryptとは
 
