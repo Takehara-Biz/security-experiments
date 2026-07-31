@@ -1,0 +1,17 @@
+name: digital-signature
+
+services:
+  sender:
+    build: .
+    container_name: sender
+    command: bash
+    tty: true
+    volumes:
+      - ./volumes/sender/app:/app
+  receiver:
+    build: .
+    container_name: receiver
+    command: /app/wait-and-receive.bash
+    tty: true
+    volumes:
+      - ./volumes/receiver/app:/app
