@@ -1,0 +1,9 @@
+name: digital-signature
+
+services:
+  app:
+    build: .
+    command: bash
+    tty: true
+    volumes:
+      - ./volumes/app:/app
