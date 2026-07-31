@@ -6,13 +6,14 @@ mkdir -p ./demoCA/newcerts
 echo "=== 1. テストCAとデータベースの初期化 ==="
 touch demoCA/index.txt
 echo "1000" >demoCA/serial
+echo "1000" >demoCA/crlnumber
 
-# CAの作成（国名 C, 都道府県 ST, 組織名 O を追加）
+# CAの作成
 openssl req -x509 -newkey rsa:2048 -nodes \
   -keyout ca.key -out ca.crt -days 365 \
   -subj "/C=JP/ST=Tokyo/O=TestOrg/CN=Test Root CA"
 
-echo "=== 2. テスト用証明書（有効なもの・失効させるもの）の作成 ==="
+echo "=== 2. テスト用証明書の作成 ==="
 # 1枚目: 有効な証明書 (good.crt)
 openssl req -newkey rsa:2048 -nodes -keyout good.key -out good.csr \
   -subj "/C=JP/ST=Tokyo/O=TestOrg/CN=good.example.com"
@@ -23,10 +24,13 @@ openssl req -newkey rsa:2048 -nodes -keyout revoked.key -out revoked.csr \
   -subj "/C=JP/ST=Tokyo/O=TestOrg/CN=revoked.example.com"
 openssl ca -batch -in revoked.csr -out revoked.crt -keyfile ca.key -cert ca.crt -days 365
 
-echo "=== 3. 2枚目の証明書を失効処理 ==="
+echo "=== 3. 2枚目の証明書を失効処理 ＆ CRLファイルの生成 ==="
 openssl ca -batch -revoke revoked.crt -keyfile ca.key -cert ca.crt
 
-echo "=== 4. OCSP レスポンダーサーバーの起動 (Port 8888) ==="
+# CRL (証明書失効リスト) ファイルの生成
+openssl ca -gencrl -out crl.pem -keyfile ca.key -cert ca.crt
+
+echo "=== 4. OCSP レスポンダーの起動 (Port 8888) ==="
 exec openssl ocsp -port 8888 \
   -index demoCA/index.txt \
   -CA ca.crt \
