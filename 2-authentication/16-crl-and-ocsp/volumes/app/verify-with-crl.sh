@@ -1,5 +1,6 @@
 #!/bin/sh
 set -euo pipefail
+cd ./certs
 
 echo ""
 echo "========================================"

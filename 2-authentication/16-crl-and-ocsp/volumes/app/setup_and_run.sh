@@ -1,7 +1,9 @@
 #!/bin/sh
 set -euo pipefail
 
-mkdir -p ./demoCA/newcerts
+DIR="./certs"
+mkdir -p $DIR/demoCA/newcerts
+cd $DIR
 
 echo "=== 1. テストCAとデータベースの初期化 ==="
 touch demoCA/index.txt

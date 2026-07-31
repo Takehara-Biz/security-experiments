@@ -1,0 +1,2 @@
+V	270731134042Z		1000	unknown	/C=JP/ST=Tokyo/O=TestOrg/CN=good.example.com
+R	270731134042Z	260731134042Z	1001	unknown	/C=JP/ST=Tokyo/O=TestOrg/CN=revoked.example.com
