@@ -11,16 +11,16 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 }
 
 // データベースの代わり
-const users = {
+const usersDB = {
   U00331001: { name: "元従業員Z", role: "user" },
   U99999999: { name: "管理者A", role: "admin" },
 };
 
 // 発行済みのcsrf_tokenを管理する。key: userId, value: token
-const csrfTokens = {};
+const csrfTokensDB = {};
 function createCsrfToken(userId) {
   const token = crypto.randomBytes(4).toString("hex").slice(0, 4); // 4桁のランダム文字列
-  csrfTokens[userId] = token; // 発行済みとして記録
+  csrfTokensDB[userId] = token; // 発行済みとして記録
   return token;
 }
 
@@ -38,14 +38,14 @@ const getCommonTopUi = (req) => {
   const userId = getUserIdFromCookie(req);
 
   // ユーザーIDに対応するユーザーを取得（トークンが無効または未設定の場合の対策も考慮）
-  const user = users[userId];
-  const userName = user ? user.name : "ゲスト";
+  const user = usersDB[userId];
 
   return `<div>「令和7秋SC問1 - Sサービス」&nbsp;
-ログイン中のユーザ：${userName}&nbsp;
+ログイン中のユーザ:${user.name}&nbsp;
+あなたのロール:${user.role}&nbsp;
 <a href="/tasks">タスク管理</a>&nbsp;
 <a href="/upload">ファイルアップロード（スレッド投稿の代わり）</a>&nbsp;
-<a href="/logout">ログアウト</a>&nbsp;
+<form action="/logout" method="POST"><button type="submit">ログアウト</button></form>
 </div><hr/>`;
 };
 
@@ -140,7 +140,8 @@ const server = http.createServer((req, res) => {
       body += chunk.toString();
     });
     req.on("end", () => {
-      const userId = getUserIdFromCookie(req);
+      // 有効期限を過去（Max-Age=0）にして上書きします
+      res.setHeader("Set-Cookie", "userId=; Max-Age=0; Path=/;");
 
       // 302 Found (一時的なリダイレクト) の場合
       res.writeHead(302, {
@@ -323,6 +324,7 @@ const server = http.createServer((req, res) => {
       <input type="hidden" id="csrf_token" name="csrf" value="${csrfToken}" />
       ↑hiddenに仕込んでいたcsrf_tokenを、F1234567890.xlsxのスクリプトが取得してPOSTリクエストに利用されてしまう。
     `);
+    return;
   }
 
   // ------------------------------------------
@@ -331,20 +333,40 @@ const server = http.createServer((req, res) => {
   if (url.pathname === "/management/roleset" && req.method === "POST") {
     console.log("POST /management/roleset リクエストを受信しました。");
     // CSRFが発生していないかチェック
-    //続きはここから！！！！！！！！
     let body = "";
     req.on("data", (chunk) => {
       body += chunk.toString();
     });
     req.on("end", () => {
-      const parsed = querystring.parse(body);
-      if (parsed.title) {
-        tasks.push({
-          id: tasks.length + 1,
-          title: parsed.title, // DBへは生の入力を保存（表示時にエスケープ）
-          deadline: parsed.deadline,
-        });
+      const parsedData = querystring.parse(body);
+      console.debug("parsedData : ", parsedData);
+      const userId = getUserIdFromCookie(req);
+      console.debug("userId : ", userId);
+      console.debug("parsedData.csrf_token : ", parsedData.csrf_token);
+      console.debug("csrfTokens[userId] : ", csrfTokensDB[userId]);
+      if (
+        !parsedData.csrf_token ||
+        !csrfTokensDB[userId] ||
+        parsedData.csrf_token !== csrfTokensDB[userId]
+      ) {
+        res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+        console.warn("CSRFトークンが無効かまたは不正なリクエストです。");
+        res.end("CSRFトークンが無効かまたは不正なリクエストです。");
+        return;
       }
+      if (usersDB[userId].role !== "admin") {
+        res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+        console.warn("ロールの設定変更には管理者権限が必要です。");
+        res.end("ロールの設定変更には管理者権限が必要です。");
+        return;
+      }
+
+      const targetUserId = parsedData.user_id;
+      const newRole = parsedData.is_admin === "1" ? "admin" : "user";
+      console.info("before : ", usersDB[targetUserId]);
+      usersDB[targetUserId].role = newRole;
+      console.info("after : ", usersDB[targetUserId]);
+
       // リダイレクト (303 See Other)
       res.writeHead(303, { Location: "/tasks" });
       res.end();
