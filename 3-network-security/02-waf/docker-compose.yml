@@ -2,22 +2,31 @@ name: waf-lab
 
 services:
   # --- 1. 脆弱性Webアプリ ---
-  vulnerable-app:
+  juice-shop:
     image: bkimminich/juice-shop:latest
-    container_name: juice-shop
     ports:
       - "3000:3000"
 
   # --- 2. WAF (OWASP ModSecurity / Nginx) ---
-  waf:
+  waf-loose:
     image: owasp/modsecurity-crs:nginx
-    container_name: waf-proxy
     ports:
       - "80:8080"
     environment:
-      - BACKEND=http://vulnerable-app:3000
+      - BACKEND=http://juice-shop:3000
       - PORT=8080
       - PARANOIA=1
+      - SEC_RULE_ENGINE=DetectionOnly
+    depends_on:
+      - juice-shop
+  waf-strict:
+    image: owasp/modsecurity-crs:nginx
+    ports:
+      - "81:8080"
+    environment:
+      - BACKEND=http://juice-shop:3000
+      - PORT=8080
+      - PARANOIA=4
       - SEC_RULE_ENGINE=On # Set to 'DetectionOnly' to log without blocking
     depends_on:
-      - vulnerable-app
+      - juice-shop
