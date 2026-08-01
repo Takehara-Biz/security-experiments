@@ -3,7 +3,7 @@ name: ufw-firewall
 services:
   # --- 1. Client コンテナ ---
   client:
-    image: alpine:latest
+    image: alpine:3.23.5
     container_name: client
     working_dir: /app
     command: tail -f /dev/null
