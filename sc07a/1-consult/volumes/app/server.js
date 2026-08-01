@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const querystring = require("querystring");
 const crypto = require("crypto");
+const { formidable } = require("formidable"); // ファイルアップロードの保存前に、余計なヘッダー情報を取り除くライブラリ
 
 // アップロード先ディレクトリの作成（なければ作成）
 const UPLOAD_DIR = path.join(__dirname, "files");
@@ -79,15 +80,18 @@ const server = http.createServer((req, res) => {
   // セキュリティヘッダーの共通設定 (試験の問1 設問1対策)
   // ==========================================
   // 1. CSP: 外部スクリプトやインラインスクリプトの無許可実行を制限
-  res.setHeader(
-    "Content-Security-Policy",
-    "default-src 'self'; script-src 'self'; object-src 'none';",
-  );
-  // 2. MIMEスニッフィング防止
-  res.setHeader("X-Content-Type-Options", "nosniff");
+  // res.setHeader(
+  //   "Content-Security-Policy",
+  //   "default-src 'self'; script-src 'self'; object-src 'none';",
+  // );
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN"); //クリックジャッキング対策
+  res.setHeader("Content-Security-Policy", "default-src 'self';");
+  // 2. MIMEスニッフィング防止。Webブラウザがファイルの種類（MIMEタイプ）を勝手に推測して意図しない動作をしないよう、制限をかけるセキュリティ対策のこと
+  //res.setHeader("X-Content-Type-Options", "nosniff");
 
   // ------------------------------------------
-  // 1. GET / (ログイン画面)
+  // 1. GET / (ログイン画面表示)
   // ------------------------------------------
   if (url.pathname === "/" && req.method === "GET") {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
@@ -155,7 +159,7 @@ const server = http.createServer((req, res) => {
   }
 
   // ------------------------------------------
-  // 4. GET /tasks (タスク一覧表示 - XSSの表示側対策)
+  // 4. GET /tasks (タスク一覧表示)
   // ------------------------------------------
   if (url.pathname === "/tasks" && req.method === "GET") {
     console.debug("タスク一覧表示リクエストを受信しました。");
@@ -174,7 +178,7 @@ const server = http.createServer((req, res) => {
       <ul>${listHtml}</ul>
       <h2>タスク追加</h2>
       <form action="/tasks" method="POST">
-        タスク名:<input type="text" name="title" placeholder="タスク名を入力" size="40" required /><br />
+        タスク名:<input type="text" name="title" placeholder="タスク名を入力" size="60" required /><br />
         タスクの締切日:<input type="date" name="deadline" required /><br />
         <button type="submit">作成</button>
       </form>
@@ -208,7 +212,7 @@ const server = http.createServer((req, res) => {
   }
 
   // ------------------------------------------
-  // 6. GET /upload (アップロード画面)
+  // 6. GET /upload (アップロード画面表示)
   // ------------------------------------------
   if (url.pathname === "/upload" && req.method === "GET") {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
@@ -224,94 +228,58 @@ const server = http.createServer((req, res) => {
   }
 
   // ------------------------------------------
-  // 4. POST /upload (手動マルチパート解析による簡易保存)
+  // 7. POST /upload (手動マルチパート解析による簡易保存)
   // ------------------------------------------
   if (url.pathname === "/upload" && req.method === "POST") {
-    let chunks = [];
-    req.on("data", (chunk) => {
-      chunks.push(chunk);
+    // formidable を使って、余計なヘッダーを除去して保存する
+    const form = formidable({
+      uploadDir: path.join(__dirname, "files"), // 保存先ディレクトリ
+      keepExtensions: true, // 拡張子を維持する
+      filename: (name, ext, part) => part.originalFilename, // 保存時のファイル名をオリジナルのものにする
     });
-    req.on("end", () => {
-      const buffer = Buffer.concat(chunks);
-      // バイナリ文字列として全体を読み込む
-      const rawData = buffer.toString("binary");
 
-      // ① ファイル名（filename="..."）を取り出す
-      const filenameMatch = rawData.match(/filename="([^"]+)"/i);
-      const filename = filenameMatch
-        ? path.basename(filenameMatch[1])
-        : `uploaded_${Date.now()}.bin`;
-
-      // ② ファイルデータ部分（空行 \r\n\r\n から末尾のバウンダリ \r\n-- の間）を正規表現で一括抽出
-      const fileMatch = rawData.match(/\r\n\r\n([\s\S]*?)\r\n--/);
-
-      if (!fileMatch) {
-        res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
-        return res.end("ファイルの抽出に失敗しました");
+    form.parse(req, (err, fields, files) => {
+      if (err) {
+        res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+        return res.end("アップロード失敗");
       }
 
-      // 抽出したバイナリ文字列を Buffer に戻して保存
-      const fileBuffer = Buffer.from(fileMatch[1], "binary");
-      const filePath = path.join(UPLOAD_DIR, filename);
-
-      fs.writeFileSync(filePath, buffer);
-
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(`
-        ${getCommonTopUi(req)}
-        <p>ファイルを受け取りました。</p>
-        <a href="/download?file=${filename}">ダウンロードテスト</a>
-      `);
+      // formidable が自動的に Boundary を除去し、純粋な中身だけをファイルとして保存してくれます
+      // リダイレクト (303 See Other)
+      res.writeHead(303, { Location: "/tasks" });
+      res.end();
     });
     return;
   }
 
   // ------------------------------------------
-  // 5. GET /files/* (スクリプトによるアクセス)
+  // 8. GET /files/* (スクリプトによるアクセス)
   // ------------------------------------------
   if (url.pathname.startsWith("/files/") && req.method === "GET") {
     const filePath = path.join(__dirname, url.pathname);
     console.debug("filePath : ", filePath);
 
-    // 1. "utf8" を指定してテキスト（String）として読み込む
-    fs.readFile(filePath, "utf8", (err, jsCode) => {
+    // ファイルをそのまま読み込んで返却（文字コード指定なしで Buffer として取得）
+    fs.readFile(filePath, (err, data) => {
       if (err) {
-        res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
-        res.end("ファイルの読み込みに失敗しました");
-        return;
+        res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+        return res.end("File Not Found");
       }
 
-      // 2. ヘッダーと本文の境目（空行）を検索
-      const headerEndIndex = jsCode.indexOf("\r\n\r\n");
-
-      if (headerEndIndex === -1) {
-        res.writeHead(400);
-        return res.end("Invalid multipart data");
-      }
-
-      // 3. 本文の開始位置 (\r\n\r\n の 4文字分後ろ)
-      const dataStart = headerEndIndex + 4;
-
-      // 4. 末尾のバウンダリの開始位置を検索
-      const dataEnd = jsCode.lastIndexOf("\r\n------");
-
-      // 5. 文字列の場合は .subarray() ではなく .slice() を使用します
-      const cleanJsCode = jsCode.slice(dataStart, dataEnd);
-
-      // 6. ブラウザに JavaScript として認識させるために Content-Type を設定
+      // X-Content-Type-Options は意図的に未設定にしておくことで、
+      // Content-Type が不適切（例: text/plain や 未設定）でもブラウザのスニフィングを誘発できます
       res.writeHead(200, {
-        "Content-Type": "application/javascript; charset=utf-8",
+        "Content-Type": "text/plain; charset=utf-8", // 例: 本来は JS なのに text/plain で返す実験など
       });
 
-      // 切り出した純粋な JS コードを返却
-      res.end(cleanJsCode);
+      res.end(data);
     });
 
     return;
   }
 
   // ------------------------------------------
-  // 6. GET /management/role
+  // 9. GET /management/role（ロール設定画面表示）
   // ------------------------------------------
   if (url.pathname === "/management/role" && req.method === "GET") {
     console.log("GET /management/role リクエストを受信しました。");
@@ -328,7 +296,7 @@ const server = http.createServer((req, res) => {
   }
 
   // ------------------------------------------
-  // 7. POST /management/roleset
+  // 10. POST /management/roleset（ロール変更処理）
   // ------------------------------------------
   if (url.pathname === "/management/roleset" && req.method === "POST") {
     console.log("POST /management/roleset リクエストを受信しました。");
@@ -381,7 +349,5 @@ const server = http.createServer((req, res) => {
 
 // サーバー起動 (ポート 3000)
 server.listen(3000, () => {
-  console.log(
-    "標準モジュール版 サーバーが起動しました: http://localhost:3000/tasks",
-  );
+  console.log("Sサービスが起動しました: http://localhost:3000/");
 });
