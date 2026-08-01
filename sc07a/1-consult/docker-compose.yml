@@ -1,0 +1,11 @@
+name: sc07a-1-consult
+
+services:
+  s-service:
+    image: node:26.5.0
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    command: node ./server.js
+    volumes:
+      - ./volumes/app:/app
