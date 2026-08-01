@@ -1,0 +1,11 @@
+FROM alpine:latest
+
+# UFWとネットワークツールのインストール
+RUN apk add --no-cache \
+    ufw \
+    iproute2 \
+    tcpdump \
+    bind-tools \
+    curl
+
+ENTRYPOINT ["./entrypoint.sh"]

@@ -1,0 +1,12 @@
+FROM alpine:latest
+
+# 必要なネットワークツールのインストール
+RUN apk add --no-cache \
+    iptables \
+    iproute2 \
+    tcpdump \
+    bind-tools \
+    curl
+
+# sysctlの実行を削除し、フォアグラウンド処理のみにする
+CMD ["tail", "-f", "/dev/null"]
