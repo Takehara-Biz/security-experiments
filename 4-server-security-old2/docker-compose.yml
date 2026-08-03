@@ -1,0 +1,71 @@
+name: bind-servers
+
+services:
+  host0:
+    build: .
+    container_name: host0.test
+    restart: always
+    privileged: true # ★カーネルパラメータの変更を許可するために特権を与えます
+    sysctls:
+      - net.ipv4.conf.all.rp_filter=0 # ★すべてのインターフェースの逆経路フィルタを無効化
+      - net.ipv4.conf.default.rp_filter=0 # ★新しく作られるインターフェースの初期値を無効化
+      - net.ipv4.conf.all.accept_local=1 # ★ローカル偽装IPの受け入れを許可
+    networks:
+      bind-network:
+        ipv4_address: 192.168.1.11
+    volumes:
+      - ./volumes/host0/app:/app
+      - ./volumes/host0/etc/resolv.conf:/etc/resolv.conf
+      - ./volumes/host0/etc/bind:/etc/bind
+  # host1:
+  #   build: .
+  #   container_name: host1.example1.test
+  #   restart: always
+  #   working_dir: /app
+  #   entrypoint: ["./entrypoint.sh"]
+  #   cap_add:
+  #     - NET_ADMIN
+  #   networks:
+  #     bind-network:
+  #       ipv4_address: 192.168.1.12
+  #   volumes:
+  #     - ./volumes/host1/app:/app
+  #     - ./volumes/host1/etc/resolv.conf:/etc/resolv.conf
+  #     - ./volumes/host1/etc/bind:/etc/bind
+  dns-dummy:
+    image: node:26.5.0
+    working_dir: /app
+    command: sh -c "npm i dns-packet && node ./server.js"
+    volumes:
+      - ./volumes/dns-dummy/app:/app
+    depends_on:
+      - host0
+    networks:
+      bind-network:
+        ipv4_address: 192.168.1.12
+  attacker:
+    build:
+      dockerfile: Dockerfile-attacker
+    container_name: attacker
+    working_dir: /app
+    restart: always
+    depends_on:
+      - dns-dummy
+    tty: true
+    # RAWソケットの作成・パケットインジェクションに必要な権限を付与
+    cap_add:
+      - NET_ADMIN
+    # 起動時に必要な最小限のツール（python3）のみを準備
+    command: sh -c "export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -y python3 bind9-dnsutils && sh"
+    networks:
+      bind-network:
+        ipv4_address: 192.168.1.13
+    volumes:
+      - ./volumes/attacker/app:/app
+      - ./volumes/attacker/etc/resolv.conf:/etc/resolv.conf
+networks:
+  bind-network:
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.1.0/24

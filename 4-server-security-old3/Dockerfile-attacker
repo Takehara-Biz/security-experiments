@@ -1,0 +1,7 @@
+# ubuntuをカスタマイズしたものを利用する。
+# bindが初期インストールされたDockerイメージでは、shやbashなどのシェルが使えず学習しづらいため、ubuntuベースで構築することにした。
+FROM ubuntu:24.04
+
+RUN export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -y python3 bind9-dnsutils 
+    
+ENTRYPOINT [ "./entrypoint.sh" ]

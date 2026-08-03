@@ -1,0 +1,19 @@
+; セミコロンはコメントを示す。
+
+$TTL 3H ; クライアントが一度問い合わせた DNS 情報をキャッシュしておく時間。
+$ORIGIN example1.test. ; 以降、末尾に「.」がないものは、自動的にこの文字列が付与される。
+@   IN SOA host1 root ( ; ゾーンファイルの先頭に記述される必須レコード。プライマリネームサーバー、管理者のメールアドレス、シリアル番号（更新時に増やす）、更新間隔などが設定される。
+    2025050501  ; serial このゾーンファイルのバージョン番号。セカンダリーネームサーバーは、プライマリーサーバーのシリアル番号の方が大きい場合にのみ、ゾーンのコピーを更新します。
+    1D  ; refresh ゾーンが更新された場合は、プライマリーサーバーをチェックする前にセカンダリーサーバーが待機する時間。
+    1H  ; retry 試行が失敗した後、セカンダリーサーバーがプライマリーサーバーへのクエリーを再試行するまでの時間。
+    1W  ; expire 以前の試行がすべて失敗した場合に、セカンダリーサーバーがプライマリーサーバーへのクエリーを停止した後の時間。
+    3H) ; minimum 名エラーをキャッシュする期間
+; SOAレコードの詳細情報→　https://docs.redhat.com/ja/documentation/red_hat_enterprise_linux/9/html/managing_networking_infrastructure_services/assembly_configuring-zones-on-a-bind-dns-server_assembly_setting-up-and-configuring-a-bind-dns-server
+
+  NS host1.example1.test. ; そのドメイン（またはサブドメイン）の管理を担当するネームサーバーを指定。
+  MX 10 mail.example1.test. ; メールの送信先となるメールサーバー。10は優先度を意味する。MXを複数定義したときに小さい数字が優先される。 
+
+; 以下Aレコードの定義。今回は全て自分自身を指定している。
+host1 A 192.168.1.12
+www   A 192.168.1.12
+mail  A 192.168.1.12

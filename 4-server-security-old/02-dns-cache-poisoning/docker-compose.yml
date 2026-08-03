@@ -1,0 +1,54 @@
+name: bind-servers
+
+services:
+  parent-dns-cache-server:
+    build: .
+    container_name: parent-dns-cache-server
+    working_dir: /app
+    entrypoint: ["./begin-delay.sh"]
+    restart: always
+    cap_add:
+      - NET_ADMIN
+    networks:
+      bind-network:
+        ipv4_address: 192.168.1.11
+    volumes:
+      - ./volumes/parent-dns-cache-server/app:/app
+      - ./volumes/parent-dns-cache-server/etc/resolv.conf:/etc/resolv.conf
+      - ./volumes/parent-dns-cache-server/etc/bind:/etc/bind
+  child-dns-cache-server:
+    build: .
+    container_name: child-dns-cache-server
+    working_dir: /app
+    restart: always
+    depends_on:
+      - parent-dns-cache-server
+    environment:
+      - BIND9_USER=bind
+    networks:
+      bind-network:
+        ipv4_address: 192.168.1.12
+    volumes:
+      - ./volumes/child-dns-cache-server/app:/app
+      - ./volumes/child-dns-cache-server/etc/resolv.conf:/etc/resolv.conf
+      - ./volumes/child-dns-cache-server/etc/bind/named.conf:/etc/bind/named.conf
+  attacker:
+    image: alpine:3.23.5
+    container_name: attacker
+    working_dir: /app
+    restart: always
+    depends_on:
+      - child-dns-cache-server
+    tty: true
+    command: sh -c "apk add --no-cache bind-tools && sh" #digコマンドを使用可能にする。
+    networks:
+      bind-network:
+        ipv4_address: 192.168.1.13
+    volumes:
+      - ./volumes/attacker/app:/app
+networks:
+  bind-network:
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.1.0/24

@@ -1,0 +1,56 @@
+version: "3.8"
+
+networks:
+  net_ab:
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+  net_bc:
+    ipam:
+      config:
+        - subnet: 172.21.0.0/24
+
+services:
+  # コンテナA: DNSキャッシュサーバ1 (10秒遅延)
+  container_a:
+    build: ./container_a
+    container_name: container_a
+    networks:
+      net_ab:
+        ipv4_address: 172.20.0.10
+    cap_add:
+      - NET_ADMIN
+
+  # コンテナB: プロキシ / MITM偽装サーバー
+  container_b:
+    build: ./container_b
+    container_name: container_b
+    tty: true
+    networks:
+      net_ab:
+        ipv4_address: 172.20.0.20
+      net_bc:
+        ipv4_address: 172.21.0.20
+    cap_add:
+      - NET_ADMIN
+    # 53番ポート宛てのUDPパケットを内部の5353ポートに横取りリダイレクトする設定を追加
+    command: >
+      sh -c "iptables -t nat -A PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5353 && python3 -u proxy_b.py"
+    depends_on:
+      - container_a
+
+  # コンテナC: DNSキャッシュサーバ2 (Aへ問い合わせをフォワード)
+  container_c:
+    build: ./container_c
+    container_name: container_c
+    networks:
+      net_bc:
+        ipv4_address: 172.21.0.30
+    cap_add:
+      - NET_ADMIN
+    # 172.20.0.0/24 (A側ネットワーク) への通信を B (172.21.0.20) 経由にルーティング
+    command: >
+      sh -c "ip route add 172.20.0.0/24 via 172.21.0.20 2>/dev/null || true; python3 -u server_c.py"
+    depends_on:
+      - container_a
+      - container_b

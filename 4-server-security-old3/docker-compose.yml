@@ -1,0 +1,73 @@
+name: bind-servers
+
+services:
+  host0:
+    build: .
+    working_dir: /app
+    container_name: host0.test
+    restart: always
+    privileged: true # ★カーネルパラメータの変更を許可するために特権を与えます
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv4.conf.all.rp_filter=0 # ★すべてのインターフェースの逆経路フィルタを無効化
+      - net.ipv4.conf.default.rp_filter=0 # ★新しく作られるインターフェースの初期値を無効化
+      - net.ipv4.conf.all.accept_local=1 # ★ローカル偽装IPの受け入れを許可
+    # host0 は「サイドA」のネットワークに所属
+    networks:
+      net-side-a:
+        ipv4_address: 192.168.1.11
+    volumes:
+      - ./volumes/host0/app:/app
+      - ./volumes/host0/etc/resolv.conf:/etc/resolv.conf
+      - ./volumes/host0/etc/bind:/etc/bind
+  dns-dummy:
+    image: node:26.5.0
+    working_dir: /app
+    entrypoint: ["./entrypoint.sh"]
+    volumes:
+      - ./volumes/dns-dummy/app:/app
+    depends_on:
+      - host0
+    # dns-dummy は「サイドB」のネットワークに所属
+    cap_add:
+      - NET_ADMIN
+    networks:
+      net-side-b:
+        ipv4_address: 192.168.2.12 # セグメントを 2.x に変更します
+  attacker:
+    build:
+      dockerfile: Dockerfile-attacker
+    container_name: attacker
+    working_dir: /app
+    restart: always
+    tty: true
+    # RAWソケットの作成・パケットインジェクションに必要な権限を付与
+    cap_add:
+      - NET_ADMIN
+    # ★ここに以下の2行を追加します
+    sysctls:
+      - net.ipv4.ip_forward=1
+    # 起動時に必要な最小限のツール（python3）のみを準備
+    command: sh -c "export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -y python3 bind9-dnsutils && sh"
+    # ★attacker は両方のネットワークに足を入れてルーターになります
+    networks:
+      net-side-a:
+        ipv4_address: 192.168.1.13
+      net-side-b:
+        ipv4_address: 192.168.2.13
+    volumes:
+      - ./volumes/attacker/app:/app
+      - ./volumes/attacker/etc/resolv.conf:/etc/resolv.conf
+# 2つの独立したネットワークを定義
+networks:
+  net-side-a:
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.1.0/24
+  net-side-b:
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.2.0/24
