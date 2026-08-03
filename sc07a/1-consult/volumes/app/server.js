@@ -1,9 +1,14 @@
 const http = require("http");
 const fs = require("fs");
+const Busboy = require("busboy");
+const { fileTypeFromFile } = require("file-type");
 const path = require("path");
 const querystring = require("querystring");
 const crypto = require("crypto");
 const { formidable } = require("formidable"); // ファイルアップロードの保存前に、余計なヘッダー情報を取り除くライブラリ
+
+// 許可する拡張子のリスト（ホワイトリスト）
+const allowedExtensions = ["docx", "xlsx", "pptx", "pdf", "jpg", "gif", "png"];
 
 // アップロード先ディレクトリの作成（なければ作成）
 const UPLOAD_DIR = path.join(__dirname, "files");
@@ -44,8 +49,8 @@ const getCommonTopUi = (req) => {
   return `<div>「令和7秋SC問1 - Sサービス」&nbsp;
 ログイン中のユーザ:${user.name}&nbsp;
 あなたのロール:${user.role}&nbsp;
-<a href="/tasks">タスク管理</a>&nbsp;
-<a href="/upload">ファイルアップロード（スレッド投稿の代わり）</a>&nbsp;
+<a href="/project-progress">タスク管理</a>&nbsp;
+<a href="/post-threads">スレッド投稿画面(ファイルアップロード機能のみ実装)</a>&nbsp;
 <form action="/logout" method="POST"><button type="submit">ログアウト</button></form>
 </div><hr/>`;
 };
@@ -99,10 +104,11 @@ const server = http.createServer((req, res) => {
       <h1>ログイン画面</h1>
       ログインしたいユーザを選択してください。（実験用に簡易的な画面にしています）<br>
       <form action="/login" method="POST">
-        <label><input type="radio" name="user" value="U00331001" required /> 元従業員Z（一般ユーザ）</label><br>
-        <label><input type="radio" name="user" value="U99999999" required /> 管理者A（管理者ユーザ）</label><br>
+        <input type="text" name="userid" placeholder="ユーザIDを入力" required /><br>
+        <input type="password" name="password" placeholder="パスワードを入力" required /><br>
         <button type="submit">ログイン</button>
       </form>
+      <p>※元従業員Z（一般ユーザ）のユーザIDとパスワードはU00331001。管理者A（管理者ユーザ）のユーザIDとパスワードはU99999999。</p>
     `);
     return;
   }
@@ -118,15 +124,23 @@ const server = http.createServer((req, res) => {
 
     // 受信完了時の処理
     req.on("end", () => {
-      // "user=U00331001" のような文字列をオブジェクトに変換
+      // 入力されたフォームデータを取得
       const parsedData = querystring.parse(body);
-      const selectedUserId = parsedData.user;
-      res.setHeader("Set-Cookie", `userId=${selectedUserId}; Path=/;`);
+      const userId = parsedData.userid;
 
-      console.log("選択されたユーザーID:", selectedUserId);
+      // 簡易的なユーザ認証処理。
+      const user = usersDB[userId];
+
+      if (!user) {
+        res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+        return res.end("ユーザID又はパスワードが不正です。");
+      }
+
+      console.info("ログインしたユーザーID:", userId);
+      res.setHeader("Set-Cookie", `userId=${userId}; Path=/;`);
       // 302 Found (一時的なリダイレクト) の場合
       res.writeHead(302, {
-        Location: "/tasks",
+        Location: "/project-progress",
       });
 
       // レスポンスを終了する
@@ -159,10 +173,10 @@ const server = http.createServer((req, res) => {
   }
 
   // ------------------------------------------
-  // 4. GET /tasks (タスク一覧表示)
+  // 4. GET /project-progress (プロジェクト進捗管理画面表示)
   // ------------------------------------------
-  if (url.pathname === "/tasks" && req.method === "GET") {
-    console.debug("タスク一覧表示リクエストを受信しました。");
+  if (url.pathname === "/project-progress" && req.method === "GET") {
+    console.debug("プロジェクト進捗管理画面リクエストを受信しました。");
     let listHtml = tasks
       .map((t) => {
         return `<li>[ID: ${t.id}] ${t.title} (締切日: ${t.deadline})</li>`;
@@ -174,23 +188,24 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(`
       ${getCommonTopUi(req)}
-      <h1>タスク一覧</h1>
+      <h1>プロジェクト進捗管理</h1>
+      <p>プロジェクトの情報が表示される。また、以下に未完了のタスクのうち締切日を過ぎたものが表示されるが、今回は登録したタスクを締切日にかかわらず全て表示している。</p>
       <ul>${listHtml}</ul>
       <h2>タスク追加</h2>
-      <form action="/tasks" method="POST">
+      <form action="/project-progress" method="POST">
         タスク名:<input type="text" name="title" placeholder="タスク名を入力" size="60" required /><br />
         タスクの締切日:<input type="date" name="deadline" required /><br />
         <button type="submit">作成</button>
       </form>
-      <br><a href="/upload">ファイルアップロード画面へ</a>
+      <br><a href="/post-threads">スレッド投稿画面(ファイルアップロード機能のみ実装)へ</a>
     `);
     return;
   }
 
   // ------------------------------------------
-  // 5. POST /tasks (タスク作成処理)
+  // 5. POST /project-progress (タスク作成処理)
   // ------------------------------------------
-  if (url.pathname === "/tasks" && req.method === "POST") {
+  if (url.pathname === "/project-progress" && req.method === "POST") {
     let body = "";
     req.on("data", (chunk) => {
       body += chunk.toString();
@@ -205,21 +220,21 @@ const server = http.createServer((req, res) => {
         });
       }
       // リダイレクト (303 See Other)
-      res.writeHead(303, { Location: "/tasks" });
+      res.writeHead(303, { Location: "/project-progress" });
       res.end();
     });
     return;
   }
 
   // ------------------------------------------
-  // 6. GET /upload (アップロード画面表示)
+  // 6. GET /post-threads (アップロード画面表示)
   // ------------------------------------------
-  if (url.pathname === "/upload" && req.method === "GET") {
+  if (url.pathname === "/post-threads" && req.method === "GET") {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(`
       ${getCommonTopUi(req)}
-      <h1>ファイルアップロード（スレッド投稿画面の代わり）</h1>
-      <form action="/upload" method="POST" enctype="multipart/form-data">
+      <h1>スレッド投稿画面(ファイルアップロード機能のみ実装)</h1>
+      <form action="/post-threads" method="POST" enctype="multipart/form-data">
         <input type="file" name="file" required />
         <button type="submit">送信</button>
       </form>
@@ -228,9 +243,56 @@ const server = http.createServer((req, res) => {
   }
 
   // ------------------------------------------
-  // 7. POST /upload (手動マルチパート解析による簡易保存)
+  // 7. POST /post-threads (手動マルチパート解析による簡易保存)
   // ------------------------------------------
-  if (url.pathname === "/upload" && req.method === "POST") {
+  if (url.pathname === "/post-threads" && req.method === "POST") {
+    const busboy = Busboy({ headers: req.headers });
+
+    // ファイルフィールドを検知したときのイベント
+    busboy.on("file", async (name, fileStream, info) => {
+      const { filename } = info;
+
+      // // 1. ファイル名から拡張子を抽出
+      // const extFromFile = path.extname(filename).slice(1).toLowerCase();
+
+      // if (!allowedExtensions.includes(extFromFile)) {
+      //   res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+      //   return res.end("許可されていないファイル拡張子です");
+      // }
+
+      try {
+        // 2. ストリームから中身（マジックナンバー）を判定
+        // 注: file-typeがストリームを読み込んでも、後続の処理に影響しません
+        // const detected = await fileTypeFromStream(fileStream);
+
+        // if (!detected) {
+        //   res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+        //   return res.end(
+        //     "ファイル形式を特定できませんでした（テキスト等は非対応）。",
+        //   );
+        // }
+        // // 実際に読み込んだファイルから推測される拡張子
+        // const extFromContent = detected.ext.toLowerCase();
+
+        // // 3. 拡張子の一致確認
+        // if (extFromFile === extFromContent) {
+        //   res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+        //   return res.end(
+        //     `不正なファイル: 拡張子は "${extFromFile}" ですが、中身は "${extFromContent}" です。`,
+        //   );
+        // }
+
+        // 4. チェック成功時の処理（ここでは保存せずそのまま読み飛ばし）
+        fileStream.resume();
+
+        res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end(`チェック成功: ${filename} (MIME: ${detected.mime})`);
+      } catch (error) {
+        res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end("サーバー内部エラーが発生しました。");
+      }
+    });
+
     // formidable を使って、余計なヘッダーを除去して保存する
     const form = formidable({
       uploadDir: path.join(__dirname, "files"), // 保存先ディレクトリ
@@ -246,7 +308,7 @@ const server = http.createServer((req, res) => {
 
       // formidable が自動的に Boundary を除去し、純粋な中身だけをファイルとして保存してくれます
       // リダイレクト (303 See Other)
-      res.writeHead(303, { Location: "/tasks" });
+      res.writeHead(303, { Location: "/project-progress" });
       res.end();
     });
     return;
@@ -336,7 +398,7 @@ const server = http.createServer((req, res) => {
       console.info("after : ", usersDB[targetUserId]);
 
       // リダイレクト (303 See Other)
-      res.writeHead(303, { Location: "/tasks" });
+      res.writeHead(303, { Location: "/project-progress" });
       res.end();
     });
     return;
