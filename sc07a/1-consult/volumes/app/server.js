@@ -92,7 +92,8 @@ const server = http.createServer((req, res) => {
   res.setHeader("X-Frame-Options", "SAMEORIGIN"); //クリックジャッキング対策
   res.setHeader("Content-Security-Policy", "default-src 'self';");
   // 2. MIMEスニッフィング防止。Webブラウザがファイルの種類（MIMEタイプ）を勝手に推測して意図しない動作をしないよう、制限をかけるセキュリティ対策のこと
-  //res.setHeader("X-Content-Type-Options", "nosniff");
+  // ⭐️問題文では問われていないが、これをセットしておくと、F1234567890.xlsxの中身のスクリプトを実行しないよう、ブラウザに促せる。
+  // res.setHeader("X-Content-Type-Options", "nosniff");
 
   // ------------------------------------------
   // 1. GET / (ログイン画面表示)
@@ -178,9 +179,13 @@ const server = http.createServer((req, res) => {
     console.debug("プロジェクト進捗管理画面リクエストを受信しました。");
     let listHtml = tasks
       .map((t) => {
-        return `<li>[ID: ${t.id}] ${t.title} (締切日: ${t.deadline})</li>`;
-        // 出力時に必ず escapeHTML を介すことで保存型XSSを無害化 (設問2/3対策)
-        //return `<li>[ID: ${t.id}] ${escapeHTML(t.title)} (締切日: ${t.deadline})</li>`;
+        // ⭐️設問3の(2)と(3)に対する回答。
+        // (A) 出力時にエスケープ処理を施さない場合。
+        title = t.title;
+        // (B) 施す場合
+        //title = escapeHTML(t.title);
+
+        return `<li>[ID: ${t.id}] ${title} (締切日: ${t.deadline})</li>`;
       })
       .join("");
 
@@ -281,24 +286,25 @@ const server = http.createServer((req, res) => {
           );
         }
 
-        // 最新版の file-type を CommonJS で呼ぶための動的 import
-        const { fileTypeFromFile } = await import("file-type");
-        const detectedType = await fileTypeFromFile(filePath); // 関数の名前に注意 (fileTypeFromFile)
+        // ⭐️設問3の(1)の回答
+        // // 最新版の file-type を CommonJS で呼ぶための動的 import
+        // const { fileTypeFromFile } = await import("file-type");
+        // const detectedType = await fileTypeFromFile(filePath); // 関数の名前に注意 (fileTypeFromFile)
 
-        // 中身がバイナリで判定できない（JS等のテキスト）、または 拡張子が一致しない場合
-        const isMatch =
-          detectedType && detectedType.ext.toLowerCase() === expectedExt;
+        // // 中身がバイナリで判定できない（JS等のテキスト）、または 拡張子が一致しない場合
+        // const isMatch =
+        //   detectedType && detectedType.ext.toLowerCase() === expectedExt;
+        //
+        // if (!isMatch) {
+        //   // 不正なファイルを即座に削除
+        //   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
-        if (!isMatch) {
-          // 不正なファイルを即座に削除
-          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-
-          console.warn(`[拒否] 拡張子偽装を検知: ${originalName}`);
-          res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
-          return res.end(
-            "不正なファイル形式です。中身と拡張子が一致しません。",
-          );
-        }
+        //   console.warn(`[拒否] 拡張子偽装を検知: ${originalName}`);
+        //   res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+        //   return res.end(
+        //     "不正なファイル形式です。中身と拡張子が一致しません。",
+        //   );
+        // }
       }
       // --- 🔺 ここまで追加 🔺 ---
 
