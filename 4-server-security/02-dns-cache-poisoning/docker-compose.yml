@@ -1,0 +1,39 @@
+name: bind-servers
+
+services:
+  dns-cache-server:
+    build: .
+    container_name: dns-cache-server
+    working_dir: /app
+    restart: always
+    ports:
+      - "53:53/udp"
+      - "53:53/tcp"
+    environment:
+      - BIND9_USER=bind
+    cap_add:
+      - NET_ADMIN
+    networks:
+      bind-network:
+        ipv4_address: 192.168.1.11
+    volumes:
+      - ./volumes/dns-cache-server/app:/app
+      - ./volumes/dns-cache-server/etc/bind/named.conf:/etc/bind/named.conf
+  attacker:
+    image: alpine:3.23.5
+    container_name: attacker
+    working_dir: /app
+    restart: always
+    tty: true
+    command: sh -c "apk add --no-cache bind-tools && sh" #digコマンドを使用可能にする。
+    networks:
+      bind-network:
+        ipv4_address: 192.168.1.12
+    volumes:
+      - ./volumes/attacker/app:/app
+networks:
+  bind-network:
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.1.0/24
