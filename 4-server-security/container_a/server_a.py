@@ -13,13 +13,13 @@ def main():
         qname = str(request.q.qname)
         print(f"[Container A] Received request for {qname} from {addr}")
 
-        # 問い合わせを受けてから10秒遅延させる
-        print("[Container A] Delaying response for 10 seconds...")
-        time.sleep(10)
+        # 問い合わせを受けてから5秒遅延させる
+        print("[Container A] Delaying response for 5 seconds...")
+        time.sleep(5)
 
         reply = DNSRecord(DNSHeader(id=request.header.id, qr=1, aa=1, ra=1), q=request.q)
         # 本来のAの回答 (例: 172.20.0.10)
-        reply.add_answer(RR(request.q.qname, QTYPE.A, rdata=A("172.20.0.10"), ttl=60))
+        reply.add_answer(RR(request.q.qname, QTYPE.A, rdata=A("172.20.0.10"), ttl=1))
         
         sock.sendto(reply.pack(), addr)
         print(f"[Container A] Sent delayed response to {addr}")

@@ -1,15 +1,3 @@
-version: "3.8"
-
-networks:
-  net_ab:
-    ipam:
-      config:
-        - subnet: 172.20.0.0/24
-  net_bc:
-    ipam:
-      config:
-        - subnet: 172.21.0.0/24
-
 services:
   # コンテナA: DNSキャッシュサーバ1 (10秒遅延)
   container_a:
@@ -21,7 +9,7 @@ services:
     cap_add:
       - NET_ADMIN
 
-  # コンテナB: プロキシ / MITM偽装サーバー
+  # コンテナB: プロキシ / MITM (Man in the Middle) 偽装サーバー
   container_b:
     build: ./container_b
     container_name: container_b
@@ -54,3 +42,12 @@ services:
     depends_on:
       - container_a
       - container_b
+networks:
+  net_ab:
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+  net_bc:
+    ipam:
+      config:
+        - subnet: 172.21.0.0/24

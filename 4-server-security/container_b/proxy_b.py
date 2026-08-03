@@ -8,11 +8,11 @@ def handle_client(data, addr, sock_bc):
         qname = str(request.q.qname)
         print(f"[Container B] Intercepted DNS query for '{qname}' from Container C ({addr})", flush=True)
 
-        # バックグラウンドでA(172.20.0.10)へ転送してAを10秒遅延処理に入らせる
+        # バックグラウンドでA(172.20.0.10)へ転送してAを5秒遅延処理に入らせる
         def forward_to_a():
             sock_a = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            # 10秒後に帰ってくるAからのパケットを受け止めてCに渡すため10秒プラスアルファ待っている。
-            sock_a.settimeout(12)
+            # 5秒後に帰ってくるAからのパケットを受け止めてCに渡すため5秒プラスアルファ待っている。
+            sock_a.settimeout(7)
             try:
                 # iptablesのループを避けるため、直接172.20.0.10:53へ送信
                 sock_a.sendto(data, ('172.20.0.10', 53))
