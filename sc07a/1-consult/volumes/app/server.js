@@ -1,7 +1,6 @@
 const http = require("http");
 const fs = require("fs");
-const Busboy = require("busboy");
-const { fileTypeFromFile } = require("file-type");
+const FileType = require("file-type");
 const path = require("path");
 const querystring = require("querystring");
 const crypto = require("crypto");
@@ -246,52 +245,7 @@ const server = http.createServer((req, res) => {
   // 7. POST /post-threads (手動マルチパート解析による簡易保存)
   // ------------------------------------------
   if (url.pathname === "/post-threads" && req.method === "POST") {
-    const busboy = Busboy({ headers: req.headers });
-
-    // ファイルフィールドを検知したときのイベント
-    busboy.on("file", async (name, fileStream, info) => {
-      const { filename } = info;
-
-      // // 1. ファイル名から拡張子を抽出
-      // const extFromFile = path.extname(filename).slice(1).toLowerCase();
-
-      // if (!allowedExtensions.includes(extFromFile)) {
-      //   res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
-      //   return res.end("許可されていないファイル拡張子です");
-      // }
-
-      try {
-        // 2. ストリームから中身（マジックナンバー）を判定
-        // 注: file-typeがストリームを読み込んでも、後続の処理に影響しません
-        // const detected = await fileTypeFromStream(fileStream);
-
-        // if (!detected) {
-        //   res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
-        //   return res.end(
-        //     "ファイル形式を特定できませんでした（テキスト等は非対応）。",
-        //   );
-        // }
-        // // 実際に読み込んだファイルから推測される拡張子
-        // const extFromContent = detected.ext.toLowerCase();
-
-        // // 3. 拡張子の一致確認
-        // if (extFromFile === extFromContent) {
-        //   res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
-        //   return res.end(
-        //     `不正なファイル: 拡張子は "${extFromFile}" ですが、中身は "${extFromContent}" です。`,
-        //   );
-        // }
-
-        // 4. チェック成功時の処理（ここでは保存せずそのまま読み飛ばし）
-        fileStream.resume();
-
-        res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
-        res.end(`チェック成功: ${filename} (MIME: ${detected.mime})`);
-      } catch (error) {
-        res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
-        res.end("サーバー内部エラーが発生しました。");
-      }
-    });
+    console.debug("POST /post-threads リクエストを受信しました。");
 
     // formidable を使って、余計なヘッダーを除去して保存する
     const form = formidable({
@@ -300,11 +254,53 @@ const server = http.createServer((req, res) => {
       filename: (name, ext, part) => part.originalFilename, // 保存時のファイル名をオリジナルのものにする
     });
 
-    form.parse(req, (err, fields, files) => {
+    form.parse(req, async (err, fields, files) => {
       if (err) {
         res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
         return res.end("アップロード失敗");
       }
+
+      // --- 🔻 ここから追加・検証処理 🔻 ---
+      const uploadedFile = Array.isArray(files.file)
+        ? files.file[0]
+        : files.file;
+
+      if (uploadedFile) {
+        const filePath = uploadedFile.filepath;
+        const originalName = uploadedFile.originalFilename || "";
+        const expectedExt = path
+          .extname(originalName)
+          .replace(".", "")
+          .toLowerCase();
+
+        if (!allowedExtensions.includes(expectedExt)) {
+          console.warn(`許可されていないファイル拡張子: ${originalName}`);
+          res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+          return res.end(
+            "許可されていない拡張子のファイルです。アップロードは受付できません。",
+          );
+        }
+
+        // 最新版の file-type を CommonJS で呼ぶための動的 import
+        const { fileTypeFromFile } = await import("file-type");
+        const detectedType = await fileTypeFromFile(filePath); // 関数の名前に注意 (fileTypeFromFile)
+
+        // 中身がバイナリで判定できない（JS等のテキスト）、または 拡張子が一致しない場合
+        const isMatch =
+          detectedType && detectedType.ext.toLowerCase() === expectedExt;
+
+        if (!isMatch) {
+          // 不正なファイルを即座に削除
+          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+          console.warn(`[拒否] 拡張子偽装を検知: ${originalName}`);
+          res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+          return res.end(
+            "不正なファイル形式です。中身と拡張子が一致しません。",
+          );
+        }
+      }
+      // --- 🔺 ここまで追加 🔺 ---
 
       // formidable が自動的に Boundary を除去し、純粋な中身だけをファイルとして保存してくれます
       // リダイレクト (303 See Other)
