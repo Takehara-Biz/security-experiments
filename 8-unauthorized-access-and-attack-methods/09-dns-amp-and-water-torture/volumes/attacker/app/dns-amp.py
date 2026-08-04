@@ -77,7 +77,7 @@ def send_spoof_dns_request(spoofed_src_ip, spoofed_src_port, target_dns_ip, targ
 
 # 実行例
 if __name__ == "__main__":
-  VICTIM_IP = "192.168.1.15"
+  VICTIM_IP = "192.168.1.14"
   VICTIM_PORT = 53
   REFLECTOR_DNS_IP = "192.168.1.12"  # 問い合わせ先のDNSキャッシュサーバー
 

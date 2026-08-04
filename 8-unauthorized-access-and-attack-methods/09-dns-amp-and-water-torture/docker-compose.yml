@@ -35,20 +35,13 @@ services:
     volumes:
       - ./volumes/dns-contents/etc/resolv.conf:/etc/resolv.conf
       - ./volumes/dns-contents/etc/bind:/etc/bind
-  victim:
-    image: nginx:1.31.3
-    container_name: victim
-    restart: always
-    networks:
-      bind-network:
-        ipv4_address: 192.168.1.14
   dns-victim:
     build: .
     container_name: dns-victim
     restart: always
     networks:
       bind-network:
-        ipv4_address: 192.168.1.15
+        ipv4_address: 192.168.1.14
 networks:
   bind-network:
     ipam:
