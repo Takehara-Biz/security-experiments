@@ -1,0 +1,50 @@
+name: bind-servers
+
+services:
+  attacker:
+    image: python:3.13.14
+    container_name: attacker
+    working_dir: /app
+    tty: true
+    restart: always
+    command: sh -c "apt update && apt install -y bind9-dnsutils && sh"
+    cap_add:
+      - NET_RAW
+    networks:
+      bind-network:
+        ipv4_address: 192.168.1.11
+    volumes:
+      - ./volumes/attacker/app:/app
+  dns-cache:
+    build: .
+    container_name: dns-cache
+    restart: always
+    networks:
+      bind-network:
+        ipv4_address: 192.168.1.12
+    volumes:
+      - ./volumes/dns-cache/etc/resolv.conf:/etc/resolv.conf
+      - ./volumes/dns-cache/etc/bind:/etc/bind
+  dns-contents:
+    build: .
+    container_name: dns-contents
+    restart: always
+    networks:
+      bind-network:
+        ipv4_address: 192.168.1.13
+    volumes:
+      - ./volumes/dns-contents/etc/resolv.conf:/etc/resolv.conf
+      - ./volumes/dns-contents/etc/bind:/etc/bind
+  victim:
+    image: nginx:1.31.3
+    container_name: victim
+    restart: always
+    networks:
+      bind-network:
+        ipv4_address: 192.168.1.14
+networks:
+  bind-network:
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.1.0/24

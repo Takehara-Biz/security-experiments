@@ -1,0 +1,10 @@
+options {
+  directory "/var/cache/bind";
+  //directory "/etc/bind";
+  listen-on port 53 { 127.0.0.1; 192.168.1.13; };
+  allow-query { 192.168.1.12; }; // dns-cacheからのみクエリを受け付ける。
+
+  recursion no; // これはDNSコンテンツサーバであり、答えを返すだけなので、これ以上再帰問い合わせは不要なのでno。
+
+  dnssec-validation auto;
+}
