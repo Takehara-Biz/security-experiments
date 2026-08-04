@@ -1,0 +1,5 @@
+zone "example2.test" IN {
+  type master;
+  file "/etc/bind/example2.test.zone";
+  allow-update { none; };
+};

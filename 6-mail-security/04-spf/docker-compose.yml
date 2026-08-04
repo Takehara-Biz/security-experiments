@@ -1,0 +1,49 @@
+name: dns-and-mail-servers
+
+services:
+  host0:
+    build:
+      dockerfile: "Dockerfile-dns"
+    container_name: host0.test
+    restart: always
+    networks:
+      bind-network:
+        ipv4_address: 192.168.1.11
+    volumes:
+      - ./volumes/host0/etc/resolv.conf:/etc/resolv.conf
+      - ./volumes/host0/etc/bind:/etc/bind
+  host1:
+    build:
+      dockerfile: "Dockerfile-dns-and-mail"
+      args:
+        POSTFIX_MAILNAME: "example1.test"
+    container_name: host1.example1.test
+    restart: always
+    networks:
+      bind-network:
+        ipv4_address: 192.168.1.12
+    volumes:
+      - ./volumes/host1/etc/resolv.conf:/etc/resolv.conf
+      - ./volumes/host1/etc/bind:/etc/bind
+      - ./volumes/host1/etc/postfix/main.cf:/etc/postfix/main.cf
+  host2:
+    build:
+      dockerfile: "Dockerfile-dns-and-mail"
+      args:
+        POSTFIX_MAILNAME: "example2.test"
+    container_name: host2.example2.test
+    restart: always
+    networks:
+      bind-network:
+        ipv4_address: 192.168.1.13
+    volumes:
+      - ./volumes/host2/app:/app
+      - ./volumes/host2/etc/resolv.conf:/etc/resolv.conf
+      - ./volumes/host2/etc/bind:/etc/bind
+      - ./volumes/host2/etc/postfix/main.cf:/etc/postfix/main.cf
+networks:
+  bind-network:
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.1.0/24

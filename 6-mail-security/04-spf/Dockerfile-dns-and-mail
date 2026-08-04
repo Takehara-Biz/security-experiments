@@ -1,0 +1,39 @@
+# ubuntuをカスタマイズしたものを利用する。
+# bindが初期インストールされたDockerイメージでは、shやbashなどのシェルが使えず学習しづらいため、ubuntuベースで構築することにした。
+FROM ubuntu:26.04
+
+# デフォルトのシェルを bash に変更
+SHELL ["/bin/bash", "-c"]
+
+# digコマンドを使うためdnsutilsをインストール
+# pingコマンドを使うためiputils-pingをインストール
+RUN apt-get update && apt-get install -y dnsutils iputils-ping
+
+# Node.jsをインストール
+RUN apt install -y nodejs npm
+
+# DNSサーバーをインストール
+RUN apt install -y bind9 bind9utils 
+
+# [BEGIN] メールサーバー構築
+# 対話プロンプトを非表示にする環境変数を設定
+RUN export DEBIAN_FRONTEND=noninteractive
+
+RUN echo "param : POSTFIX_MAILNAME=${POSTFIX_MAILNAME}"
+# Postfixの設定値を事前に登録
+RUN debconf-set-selections <<< "postfix postfix/mailname string ${POSTFIX_MAILNAME}"
+RUN debconf-set-selections <<< "postfix postfix/main_mailer_type string 'Internet Site'"
+
+# メールサーバー構築のために、postfix, dovecot-pop3d, dovecot-imapdをインストール
+# postfixのインストールは、通常はGUI操作を挟むが、上の方の設定により省略される。
+RUN apt install -y postfix dovecot-pop3d dovecot-imapd
+# [  END] メールサーバー構築
+
+# [BEGIN] 先行インストール。教科書の中で実行するコマンドを先回りしています。必要に応じてコメントアウトしてOK。
+# 「6.12 mailコマンドを使ったメール送受信のテスト」でインストールするパッケージ
+RUN apt install -y mailutils
+# [  END] 先行インストール
+
+COPY entrypoint.bash /entrypoint.bash
+RUN chmod +x /entrypoint.bash
+ENTRYPOINT ["/entrypoint.bash"]

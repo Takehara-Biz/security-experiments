@@ -1,0 +1,17 @@
+$TTL 3H
+$ORIGIN example1.test.
+@   IN SOA host1 root (
+    2025050501  ; serial
+    1D  ; refresh
+    1H  ; retry
+    1W  ; expire
+    3H) ; minimum
+  NS host1.example1.test.
+  MX 10 mail.example1.test.
+
+host1 A 192.168.1.12
+www   A 192.168.1.12
+mail  A 192.168.1.12
+
+; --- SPFレコードの設定 ---
+@       IN      TXT     "v=spf1 ip4:192.168.1.12 ~all"

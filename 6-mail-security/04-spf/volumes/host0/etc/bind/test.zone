@@ -1,0 +1,15 @@
+$TTL 3H
+$ORIGIN test.
+@   IN SOA host0 root (
+    2025050501  ; serial
+    1D  ; refresh
+    1H  ; retry
+    1W  ; expire
+    3H) ; minimum
+  NS host0.test.
+example1.test. NS host1.example1.test.
+example2.test. NS host2.example2.test.
+
+host0 A 192.168.1.11
+host1.example1.test.  A 192.168.1.12
+host2.example2.test.  A 192.168.1.13

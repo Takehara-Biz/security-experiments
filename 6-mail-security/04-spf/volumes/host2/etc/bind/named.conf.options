@@ -1,0 +1,11 @@
+options {
+  directory "/var/cache/bind";
+  //directory "/etc/bind";
+  listen-on port 53 { 127.0.0.1; 192.168.1.13; };
+  listen-on-v6 port 53 { ::1;};
+  allow-query { any; };
+
+  recursion no;
+
+  dnssec-validation auto;
+}

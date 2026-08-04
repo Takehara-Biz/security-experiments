@@ -1,0 +1,14 @@
+$TTL 3H
+$ORIGIN example2.test.
+@   IN SOA host2 root (
+  2025050501  ; serial
+    1D  ; refresh
+    1H  ; retry
+    1W  ; expire
+    3H) ; minimum
+  NS host2.example2.test.
+  MX 10 mail.example2.test.
+
+host2 A 192.168.1.13
+www   A 192.168.1.13
+mail  A 192.168.1.13
