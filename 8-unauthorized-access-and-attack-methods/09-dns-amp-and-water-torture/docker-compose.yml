@@ -42,6 +42,13 @@ services:
     networks:
       bind-network:
         ipv4_address: 192.168.1.14
+  dns-victim:
+    build: .
+    container_name: dns-victim
+    restart: always
+    networks:
+      bind-network:
+        ipv4_address: 192.168.1.15
 networks:
   bind-network:
     ipam:

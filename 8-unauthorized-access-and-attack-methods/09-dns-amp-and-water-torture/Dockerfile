@@ -6,4 +6,4 @@ FROM ubuntu:26.04
 # pingコマンドを使うためiputils-pingをインストール
 RUN apt-get update && apt-get install -y bind9 bind9utils dnsutils iputils-ping
 
-CMD ["/usr/sbin/named", "-g", "-c", "/etc/bind/named.conf", "-u", "bind"]
+CMD ["/usr/sbin/named", "-g", "-d", "3", "-c", "/etc/bind/named.conf", "-u", "bind"]
