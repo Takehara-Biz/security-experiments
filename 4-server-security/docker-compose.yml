@@ -26,6 +26,8 @@ services:
       sh -c "iptables -t nat -A PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5353 && python3 -u proxy_b.py"
     depends_on:
       - container_a
+    volumes:
+      - ./volumes/container_b/app:/app
 
   # コンテナC: DNSキャッシュサーバ2 (Aへ問い合わせをフォワード)
   container_c:
@@ -42,7 +44,7 @@ services:
     depends_on:
       - container_a
       - container_b
-  # コンテナC: DNSキャッシュサーバ2 (Aへ問い合わせをフォワード)
+  # コンテナD: DNSキャッシュサーバ2 (Aへ問い合わせをフォワード)
   container_d:
     build: ./container_d
     container_name: container_d
@@ -51,7 +53,7 @@ services:
       net_bcd:
         ipv4_address: 172.21.0.40
     volumes:
-      - ./volumes/container_d/:/app
+      - ./volumes/container_d/app:/app
 networks:
   net_ab:
     ipam:
